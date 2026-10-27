@@ -113,6 +113,20 @@ private static ArchCondition<JavaClass> callATransactionalMethodOfTheirOwnClass(
 
 This is the custom condition for the second trap. It looks at every method call a class makes, and flags a call whose target is a `@Transactional` method of **the same class**, because such a call skips the Spring proxy and the transaction never starts. A second rule forbids `@Transactional` on private methods for the same reason.
 
+**The test class that holds the ArchUnit rules, with its rule names:**
+
+- `src/test/java/dev/plainround/orders/ArchitectureTest.java`:
+  - `layersOnlyDependInward`
+  - `domainDependsOnNothingButTheJdk`
+  - `applicationKnowsOnlyTheDomainTheJdkLoggingAndTransactions`
+  - `persistenceEntitiesStayInsideTheirPackage`
+  - `noFieldInjection`
+  - `controllersLiveInTheInterfacesLayer`
+  - `adaptersLiveInInfrastructure`
+  - `noPackageCycles`
+  - `noSelfInvocationOfTransactionalMethods`
+  - `transactionalIsNeverOnAPrivateMethod`
+
 ## Try it yourself
 
 1. `./mvnw test -Dtest=ArchitectureTest` runs the rules.

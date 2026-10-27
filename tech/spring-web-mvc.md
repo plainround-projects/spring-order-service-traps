@@ -19,6 +19,8 @@ The lesson is about walking from an HTTP request to a method and back: how input
 
 ## How it works underneath
 
+HTTP in brief (more in `curl.md`): a **request** has a method (`GET`, `POST`, `PUT`, `DELETE`), a URL with a path and an optional query string, headers and an optional body; a **response** has a status code (2xx success, 4xx the caller erred, 5xx the server failed), headers and a body. A **servlet** is the Java standard for code that answers HTTP requests; Spring MVC is built on one servlet. A **filter** is code that sees every request and response before and after the rest. A **thread** is one line of execution; the server handles each request on its own thread.
+
 1. The embedded Tomcat accepts a TCP connection and parses the HTTP text into a request object.
 2. The request passes through the **filter chain**: classes that can look at or change every request and response before and after the rest (here: assign an id).
 3. A single servlet called the **DispatcherServlet** picks the controller method whose mapping matches the URL and method.
@@ -72,7 +74,43 @@ public ProblemDetail handleOutOfStock(OutOfStock exception) {
 
 Each named error has one handler: `CustomerNotFound` 404, `OutOfStock` and `StockConflict` 409, `InvalidOrder` 422, anything else 500 with no detail leaked. The class extends `ResponseEntityExceptionHandler` so the framework's own errors share the same shape (see `problem-details.md`).
 
-The filter `RequestIdFilter` assigns an `X-Request-Id`, puts it in the log context and echoes it in the response, exactly as in the first project.
+The filter:
+
+```java
+protected void doFilterInternal(
+        HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+        throws ServletException, IOException {
+    String requestId = idFor(request.getHeader(HEADER));
+    MDC.put(MDC_KEY, requestId);
+    response.setHeader(HEADER, requestId);
+    try {
+        chain.doFilter(request, response);
+    } finally {
+        MDC.remove(MDC_KEY);
+    }
+}
+```
+
+`OncePerRequestFilter` guarantees one run per request. The filter takes the caller\'s `X-Request-Id` if it looks safe (letters, digits, `.`, `_`, `-`, up to 64 characters), otherwise makes a UUID, puts it in the **MDC** (a per-thread map the logger reads, see `structured-logging.md`), sets the response header, runs the rest of the chain, and always removes the id in `finally`, because the server reuses threads and the id must not leak into the next request.
+
+**Every production class that belongs to the web layer (controllers, request and answer records, the advice and the filters):**
+
+| File | What it is |
+| --- | --- |
+| `src/main/java/dev/plainround/orders/interfaces/web/AuditController.java` | HTTP face of the audit trail (read only). |
+| `src/main/java/dev/plainround/orders/interfaces/web/AuditResponse.java` | An audit entry as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CheckoutRequest.java` | The body of `POST /customers/{id`/orders}. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CustomerController.java` | HTTP face of the customers. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CustomerResponse.java` | A customer as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/LineRequest.java` | One line of a checkout request. |
+| `src/main/java/dev/plainround/orders/interfaces/web/NewCustomerRequest.java` | The body of `POST /customers`. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrderController.java` | HTTP face of checkout and of a customer's order list. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrderResponse.java` | An order as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrdersExceptionHandler.java` | The one place errors become `application/problem+json`: the service's named errors, validation failures with the failing fields, the framework's own exceptions (through the parent class) and a last resort that never leaks the cause. |
+| `src/main/java/dev/plainround/orders/interfaces/web/RequestIdFilter.java` | Gives every request an id for the logs: the caller's `X-Request-Id` when it looks safe, else a new one. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockController.java` | HTTP face of the stock levels. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockRequest.java` | The body of `PUT /stock/{sku`}. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockResponse.java` | The units on hand for a SKU. |
 
 ## Try it yourself
 

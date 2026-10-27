@@ -69,6 +69,19 @@ public StockResponse set(
 
 Here a constraint (`@NotBlank @Size(max = 64)`) sits directly on the path variable, and `@Valid` sits on the body. When any parameter has a constraint, Spring validates the whole method call and reports problems as a `HandlerMethodValidationException`; the advice class reads both kinds of exception.
 
+**Every production class that carries Bean Validation annotations or `@Valid`:**
+
+| File | What it is |
+| --- | --- |
+| `src/main/java/dev/plainround/orders/interfaces/web/AuditController.java` | HTTP face of the audit trail (read only). |
+| `src/main/java/dev/plainround/orders/interfaces/web/CheckoutRequest.java` | The body of `POST /customers/{id`/orders}. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CustomerController.java` | HTTP face of the customers. |
+| `src/main/java/dev/plainround/orders/interfaces/web/LineRequest.java` | One line of a checkout request. |
+| `src/main/java/dev/plainround/orders/interfaces/web/NewCustomerRequest.java` | The body of `POST /customers`. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrderController.java` | HTTP face of checkout and of a customer's order list. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockController.java` | HTTP face of the stock levels. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockRequest.java` | The body of `PUT /stock/{sku`}. |
+
 ## Try it yourself
 
 1. `curl -s -X POST localhost:18102/customers/1/orders -H 'Content-Type: application/json' -d '{"lines":[{"sku":"","quantity":0}]}'` lists `lines[0].sku` and `lines[0].quantity`.

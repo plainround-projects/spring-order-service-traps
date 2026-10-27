@@ -61,6 +61,40 @@ void anOutOfStockLineStopsTheCheckoutAndLaterLinesAreNotReserved() {
 
 `@MockitoBean` replaces the real service in the web-layer test, so only the controller and the advice run.
 
+**Every test class that creates mocks (`mock(...)`, `@MockitoBean`, `@Mock`), with its tests:**
+
+- `src/test/java/dev/plainround/orders/application/CheckoutServiceTest.java`:
+  - `checkoutAuditsFirstThenPlacesTheOrderThenReservesEveryLine`
+  - `anOutOfStockLineStopsTheCheckoutAndLaterLinesAreNotReserved`
+  - `anUnknownCustomerStillLeavesTheAuditEntryAndPlacesNothing`
+  - `aRepeatedSkuIsRejectedBeforeAnythingIsStored`
+- `src/test/java/dev/plainround/orders/application/QueryAndCustomerServicesTest.java`:
+  - `registerStoresAValidatedName`
+  - `registerRejectsABlankNameBeforeStoring`
+  - `requireOfAnUnknownIdIsCustomerNotFound`
+  - `listOrdersChecksTheCustomerThenReadsTheOrders`
+  - `stockServiceSetsAndReadsLevelsAndNamesAMissingSku`
+  - `auditServiceReturnsTheNewestEntries`
+- `src/test/java/dev/plainround/orders/interfaces/web/CustomerStockAuditControllersTest.java`:
+  - `registerReturns201WithTheNewCustomer`
+  - `aBlankNameIs400NamingTheField`
+  - `getOfAnUnknownCustomerIs404`
+  - `putSetsTheStockLevel`
+  - `aNegativeLevelIs400`
+  - `getOfASkuWithoutAStockRecordIs409OutOfStock`
+  - `auditReturnsTheNewestEntriesAndBoundsTheLimit`
+- `src/test/java/dev/plainround/orders/interfaces/web/OrderControllerTest.java`:
+  - `checkoutReturns201WithTheStoredOrder`
+  - `anEmptyBasketIs400NamingTheLines`
+  - `aBadLineIs400NamingTheLineAndField`
+  - `anUnknownCustomerIs404`
+  - `anOutOfStockLineIs409`
+  - `aLostStockRaceIs409NamedConcurrentUpdate`
+  - `aRuleTheAnnotationsCannotExpressIs422`
+  - `listReturnsTheOrdersWithTheirLines`
+  - `aNonNumericCustomerIdIsAProblemDetail400`
+  - `anUnexpectedErrorIs500WithoutLeakingTheMessage`
+
 ## Try it yourself
 
 1. `./mvnw test -Dtest=CheckoutServiceTest`.

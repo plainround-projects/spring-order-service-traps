@@ -17,6 +17,8 @@ Every endpoint receives and returns JSON. Records are used for every request and
 
 ## How it works underneath
 
+A **JSON object** is a set of named values in curly braces, `{"title": "Dune", "pages": 412}`; a **JSON array** is an ordered list in square brackets, `[1, 2, 3]`. Values can themselves be objects or arrays, so JSON nests. Strings use double quotes. There is no date type: dates travel as text.
+
 1. Spring MVC has **message converters**. For `application/json` the converter is backed by Jackson.
 2. On a request, the converter reads the body bytes and calls Jackson to build the record named by the `@RequestBody` parameter. Unknown fields are ignored by Spring Boot's setup; a missing field becomes `null` (or `0` for `int`).
 3. On the answer, Jackson walks the record's components and writes `{"name": value, ...}` using the component names.
@@ -55,6 +57,19 @@ public record OrderResponse(long id, long customerId, Instant placedAt, List<Lin
 ```
 
 A record can contain another record (`LineResponse`) and a list of them; Jackson follows the structure. `Instant placedAt` is written as an ISO text timestamp such as `2026-10-27T10:00:00Z`. The request side, `CheckoutRequest`, holds a list of `LineRequest`.
+
+**Every record that is a JSON shape (a request or an answer):**
+
+| File | What it is |
+| --- | --- |
+| `src/main/java/dev/plainround/orders/interfaces/web/AuditResponse.java` | An audit entry as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CheckoutRequest.java` | The body of `POST /customers/{id`/orders}. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CustomerResponse.java` | A customer as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/LineRequest.java` | One line of a checkout request. |
+| `src/main/java/dev/plainround/orders/interfaces/web/NewCustomerRequest.java` | The body of `POST /customers`. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrderResponse.java` | An order as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockRequest.java` | The body of `PUT /stock/{sku`}. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockResponse.java` | The units on hand for a SKU. |
 
 ## Try it yourself
 

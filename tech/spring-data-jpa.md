@@ -143,6 +143,24 @@ It loads the stock row, refuses if there are too few units, decreases the number
 
 **The counting tests.** `NPlusOneIT` reads `entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics()` and asserts `getPrepareStatementCount()`: 21 for the naive listing of 20 orders, 201 for 200, and 1 for the entity-graph version at both sizes. `OpenInViewIT` and `OpenInViewOnIT` show the lazy load failing (HTTP 500) when open-in-view is off and being hidden (HTTP 200) when it is on.
 
+**Every class in the persistence package:**
+
+| File | What it is |
+| --- | --- |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/AuditJpaRepository.java` | Spring Data access to the audit trail. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/AuditRecordEntity.java` | The `audit_records` table. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/CustomerEntity.java` | The `customers` table. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/CustomerJpaRepository.java` | Spring Data access to customers. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaAuditLog.java` | Adapter: the audit trail. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaCustomerRepository.java` | Adapter: the customer port on top of Spring Data JPA. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaOrderRepository.java` | Adapter: the order port on top of Spring Data JPA. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaStockRepository.java` | Adapter: the stock port on top of Spring Data JPA, with optimistic locking on every change. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/OrderEntity.java` | The `orders_table` table ("order" is a reserved SQL word). |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/OrderJpaRepository.java` | Spring Data access to orders. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/OrderLineEntity.java` | The `order_lines` table. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/StockItemEntity.java` | The `stock_items` table; `version` makes concurrent updates of one row fail loudly. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/StockJpaRepository.java` | Spring Data access to stock records. |
+
 ## Try it yourself
 
 1. `make traps` runs the trap tests and prints the measured numbers (needs Docker).

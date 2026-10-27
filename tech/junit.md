@@ -61,6 +61,116 @@ void clean() {
 
 `@AfterEach` runs after every test method in that class: here it empties the database so the next test starts clean.
 
+**Every test class in this repository, with the test methods JUnit runs in it:**
+
+- `src/test/java/dev/plainround/orders/ApplicationConfigurationTest.java`:
+  - `openInViewIsOffAndHibernateOnlyValidatesTheSchemaFlywayOwns`
+  - `logsAreJsonShutdownIsGracefulAndProbesAreOn`
+  - `theDatabasePasswordHasNoDefaultAndEveryDatabaseCallIsBounded`
+- `src/test/java/dev/plainround/orders/ArchitectureTest.java`:
+  - `layersOnlyDependInward`
+  - `domainDependsOnNothingButTheJdk`
+  - `applicationKnowsOnlyTheDomainTheJdkLoggingAndTransactions`
+  - `persistenceEntitiesStayInsideTheirPackage`
+  - `noFieldInjection`
+  - `controllersLiveInTheInterfacesLayer`
+  - `adaptersLiveInInfrastructure`
+  - `noPackageCycles`
+  - `noSelfInvocationOfTransactionalMethods`
+  - `transactionalIsNeverOnAPrivateMethod`
+- `src/test/java/dev/plainround/orders/OrderServiceScenarioIT.java`:
+  - `checkoutListFailAndAuditThroughTheApi`
+  - `errorsAreProblemJsonAtTheBoundary`
+  - `healthIsUpWithTheDatabaseBehindIt`
+- `src/test/java/dev/plainround/orders/ReviewChecklistTest.java`:
+  - `theChecklistHasFiveLinesAndEveryLineNamesAnExistingTest`
+- `src/test/java/dev/plainround/orders/SqlMirrorTest.java`:
+  - `sqlMigrationsMirrorTheFlywayMigrations`
+- `src/test/java/dev/plainround/orders/application/CheckoutServiceTest.java`:
+  - `checkoutAuditsFirstThenPlacesTheOrderThenReservesEveryLine`
+  - `anOutOfStockLineStopsTheCheckoutAndLaterLinesAreNotReserved`
+  - `anUnknownCustomerStillLeavesTheAuditEntryAndPlacesNothing`
+  - `aRepeatedSkuIsRejectedBeforeAnythingIsStored`
+- `src/test/java/dev/plainround/orders/application/QueryAndCustomerServicesTest.java`:
+  - `registerStoresAValidatedName`
+  - `registerRejectsABlankNameBeforeStoring`
+  - `requireOfAnUnknownIdIsCustomerNotFound`
+  - `listOrdersChecksTheCustomerThenReadsTheOrders`
+  - `stockServiceSetsAndReadsLevelsAndNamesAMissingSku`
+  - `auditServiceReturnsTheNewestEntries`
+- `src/test/java/dev/plainround/orders/domain/CustomerAndOrderTest.java`:
+  - `aCustomerNeedsANameOfOneToHundredCharacters`
+  - `aStoredOrderKeepsItsOwnCopyOfTheLines`
+  - `namedErrorsSayWhatWentWrong`
+- `src/test/java/dev/plainround/orders/domain/OrderDraftTest.java`:
+  - `aDraftNeedsAtLeastOneLine`
+  - `aDraftHasAtMostFiftyLines`
+  - `theSameSkuOnTwoLinesIsRejected`
+  - `theDraftKeepsItsOwnCopyOfTheLines`
+- `src/test/java/dev/plainround/orders/domain/OrderLineTest.java`:
+  - `aLineKeepsItsSkuAndQuantity`
+  - `quantitiesOutsideOneToAThousandAreRejected`
+  - `blankOrOverlongSkusAreRejected`
+- `src/test/java/dev/plainround/orders/interfaces/web/CustomerStockAuditControllersTest.java`:
+  - `registerReturns201WithTheNewCustomer`
+  - `aBlankNameIs400NamingTheField`
+  - `getOfAnUnknownCustomerIs404`
+  - `putSetsTheStockLevel`
+  - `aNegativeLevelIs400`
+  - `getOfASkuWithoutAStockRecordIs409OutOfStock`
+  - `auditReturnsTheNewestEntriesAndBoundsTheLimit`
+- `src/test/java/dev/plainround/orders/interfaces/web/OrderControllerTest.java`:
+  - `checkoutReturns201WithTheStoredOrder`
+  - `anEmptyBasketIs400NamingTheLines`
+  - `aBadLineIs400NamingTheLineAndField`
+  - `anUnknownCustomerIs404`
+  - `anOutOfStockLineIs409`
+  - `aLostStockRaceIs409NamedConcurrentUpdate`
+  - `aRuleTheAnnotationsCannotExpressIs422`
+  - `listReturnsTheOrdersWithTheirLines`
+  - `aNonNumericCustomerIdIsAProblemDetail400`
+  - `anUnexpectedErrorIs500WithoutLeakingTheMessage`
+- `src/test/java/dev/plainround/orders/interfaces/web/RequestIdFilterTest.java`:
+  - `aSafeIncomingIdIsKeptAndPutInTheLogContextForTheRequestOnly`
+  - `anUnsafeIncomingIdIsReplacedSoItCannotForgeLogLines`
+  - `aMissingIdIsGenerated`
+- `src/test/java/dev/plainround/orders/support/DatabaseReset.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/support/Evidence.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/support/PostgresContainer.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/AuditIT.java`:
+  - `sameTransactionAuditIsLostWhenCheckoutFails`
+  - `auditWithRequiresNewSurvivesRollback`
+  - `requiresNewOnTheSameBeanIsIgnored`
+- `src/test/java/dev/plainround/orders/traps/AuditTrapBeans.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/CheckoutIT.java`:
+  - `checkoutStoresTheOrderWithAllItsLinesAndTakesTheStock`
+  - `aLaterLineOutOfStockRollsBackTheOrderAndTheEarlierReservationButKeepsTheAudit`
+  - `anUnknownCustomerLeavesOnlyTheAuditEntry`
+  - `aTransactionThatReadAStaleStockVersionLosesTheRaceInsteadOfOverwriting`
+  - `racingCheckoutsForTheLastUnitsNeverOversell`
+- `src/test/java/dev/plainround/orders/traps/LazyEndpointConfig.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/NPlusOneIT.java`:
+  - `theNaiveListingRunsOneQueryForTheOrdersAndOneMorePerOrderForItsLines`
+  - `theNaiveCountKeepsGrowingWith200Orders`
+  - `fetchJoinLoadsTwentyOrdersWithTheirLinesInOneStatement`
+  - `fetchJoinKeepsQueryCountFlatAt200Orders`
+- `src/test/java/dev/plainround/orders/traps/NaiveOrderJpaRepository.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/OpenInViewIT.java`:
+  - `aLazyLoadOutsideATransactionFailsWhenOpenInViewIsOff`
+- `src/test/java/dev/plainround/orders/traps/OpenInViewOnIT.java`:
+  - `openInViewOnHidesTheLazyLoadByKeepingTheSessionOpenForTheWholeRequest`
+- `src/test/java/dev/plainround/orders/traps/OrderModelIT.java`:
+  - `savesAndReadsBackACustomerWithTwoOrdersOfThreeLinesEach`
+  - `loadingOneOrderByIdIsExactlyOneStatement`
+  - `openInViewIsExplicitlyOffInTheApplicationConfiguration`
+- `src/test/java/dev/plainround/orders/traps/SchemaMirrorIT.java`:
+  - `theSchemaScriptBuildsTheSameSchemaAsTheMigrations`
+- `src/test/java/dev/plainround/orders/traps/SelfInvocationIT.java`:
+  - `selfInvocationLeavesAPartialOrderOnFailure`
+  - `proxyFixedRollsBackCompletelyOnTheSameFailure`
+  - `proxyFixedCommitsTheWholeOrderWhenNothingFails`
+- `src/test/java/dev/plainround/orders/traps/SelfInvokingCheckout.java`: a helper used by the tests
+
 ## Try it yourself
 
 1. `./mvnw test` runs the `*Test` classes and prints one line per class.

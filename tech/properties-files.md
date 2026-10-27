@@ -18,14 +18,23 @@ The lesson wants configuration to come from the environment with checked default
 
 ## How it works underneath
 
-1. At startup Spring Boot collects settings from several **sources** and ranks them. From strongest to weakest, the ones that matter here: command-line arguments (`--server.port=0`), operating-system environment variables, then the properties files.
+First, three words this note uses:
+
+- An **environment variable** is a named value that the operating system gives to every program it starts, for example `POSTGRES_PASSWORD=abc`. A program reads it by name. Containers and scripts use them to pass settings in without changing any file.
+- A **port** is a number (0 to 65535) that tells the operating system which program on this machine should receive a network connection. A web server listens on one port; a client says "host plus port" to reach it.
+- The **classpath** is the list of places where Java looks for classes and resource files while the program runs. Maven copies everything under `src/main/resources` into `target/classes`, which is on the classpath.
+
+How the file is used:
+
+1. At startup Spring Boot collects settings from several **sources** and ranks them. From strongest to weakest, the ones that matter here: command-line arguments (`--server.port=0`), then environment variables, then the properties files.
 2. **Relaxed binding:** the environment variable `READING_LIST_MAX_PAGE_SIZE` and the property `reading-list.max-page-size` name the same setting. Upper case with underscores works for any key. That is how a container is configured without touching the file.
-3. **Placeholders:** `${NAME:default}` means "the value of NAME if it is set, otherwise `default`". `${NAME}` with no default stays unresolved if `NAME` is missing.
-4. Two files with the same name can both apply. Spring Boot reads `classpath:/application.properties` and `classpath:/config/application.properties` and the second wins. That is why the test overrides live in a `config/` folder: a test file placed beside the main one would **replace** it (the same classpath path), and the app would lose its settings.
+3. **Placeholders:** `${NAME:default}` means "the value of NAME (an environment variable or another setting) if it is set, otherwise `default`". `${NAME}` with no default stays unresolved if `NAME` is missing.
+4. Two files with the same name can both apply. Spring Boot reads `classpath:/application.properties` and `classpath:/config/application.properties`, and the second wins. That is why the test overrides live in a `config/` folder: a test file placed beside the main one would **replace** it (the same classpath path), and the application would lose its settings.
+5. A line that starts with `#` is a comment. Everything after the first `=` is the value, including spaces.
 
 ## Walkthrough of this repository's use
 
-The whole file:
+The whole main file:
 
 ```properties
 # Database: every value comes from the environment (see .env.example). The password has no default on purpose:
@@ -58,12 +67,53 @@ server.shutdown=graceful
 spring.lifecycle.timeout-per-shutdown-phase=20s
 ```
 
-- `spring.datasource.url=jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:15432}/${POSTGRES_DB:orders}?connectTimeout=3&socketTimeout=30&tcpKeepAlive=true` builds the database address from placeholders with defaults. After the `?` are options for the PostgreSQL driver: give up connecting after 3 seconds, give up waiting for an answer after 30, send keep-alive packets.
-- `spring.datasource.password=${POSTGRES_PASSWORD}` has no default on purpose: the password only ever comes from the environment.
-- `spring.datasource.hikari.*` configures the **connection pool** (a set of open database connections that requests borrow): at most 10, wait at most 3000 ms for one, retry the first connection for up to 30 seconds at startup.
-- `spring.transaction.default-timeout=15s` and `spring.jpa.properties.jakarta.persistence.query.timeout=10000` cap how long a transaction and a query may run.
-- `spring.jpa.open-in-view=false` is the lesson's rule from the first commit (see `spring-data-jpa.md`). `spring.jpa.hibernate.ddl-auto=validate` makes Hibernate check, never change, the schema.
-- `logging.structured.*`, `management.*` and `server.shutdown` are the same operability settings as in the other projects.
+Every key in that file, with the value it has here and what it does:
+
+| Key | Value in this file | What it does |
+| --- | --- | --- |
+| `spring.datasource.url` | `jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:15432}/${POSTGRES_DB:orders}?connectTimeout=3&socketTimeout=30&tcpKeepAlive=true` | The JDBC address of the database (host, port, database name) plus driver options after the `?`. The `${NAME:default}` parts are filled from environment variables. |
+| `spring.datasource.username` | `${POSTGRES_USER:orders}` | The database user, from `POSTGRES_USER` with a default. |
+| `spring.datasource.password` | `${POSTGRES_PASSWORD}` | The database password. It has no default: it must come from the environment variable `POSTGRES_PASSWORD`. |
+| `spring.datasource.hikari.maximum-pool-size` | `10` | The most open database connections the pool keeps. |
+| `spring.datasource.hikari.connection-timeout` | `3000` | How long a request may wait to borrow a database connection from the pool, in milliseconds. |
+| `spring.datasource.hikari.initialization-fail-timeout` | `30000` | At startup, how long the pool keeps trying to reach the database before giving up, in milliseconds. |
+| `spring.transaction.default-timeout` | `15s` | The longest a transaction may run before it is rolled back. |
+| `spring.jpa.properties.jakarta.persistence.query.timeout` | `10000` | Cancel any query that runs longer than this many milliseconds. |
+| `spring.jpa.open-in-view` | `false` | `false` closes the database session when the service method ends, so touching a lazy association later (while the web layer writes the answer) fails visibly. |
+| `spring.jpa.hibernate.ddl-auto` | `validate` | `validate` makes Hibernate only check that the tables match the entity classes; it never creates or changes tables (Flyway does that). |
+| `spring.jpa.properties.hibernate.jdbc.time_zone` | `UTC` | Store and read timestamps in UTC. |
+| `spring.mvc.problemdetails.enabled` | `true` | Turn on `application/problem+json` answers for the framework's own errors. |
+| `logging.structured.format.console` | `logstash` | Print each log line to the console as one JSON object (the "logstash" layout) instead of plain text. Tools can then search by field. |
+| `logging.structured.json.add.service` | `order-service` | Add a fixed field named `service` to every JSON log line, so lines from different programs can be told apart. |
+| `management.endpoints.web.exposure.include` | `health` | Which Actuator endpoints are reachable over HTTP. An endpoint is a built-in address under `/actuator`; by default only `health` is reachable, and this list adds the others. |
+| `management.endpoint.health.probes.enabled` | `true` | Turn on two extra health addresses, `/actuator/health/liveness` ("the process is alive") and `/actuator/health/readiness` ("it can take requests now"). |
+| `server.shutdown` | `graceful` | `graceful` means: when told to stop, stop accepting new requests, let the running ones finish, then exit. |
+| `spring.lifecycle.timeout-per-shutdown-phase` | `20s` | The longest the graceful shutdown waits for running requests. |
+
+The comment lines in the file explain the reason for each group of settings; they are part of the file and worth reading in place.
+
+The test file, which Spring Boot merges over the main one when tests run:
+
+```properties
+# Test-only overrides, merged over src/main/resources/application.properties.
+# Plain-text logs for unit and slice tests; the end-to-end test turns JSON on itself.
+logging.structured.format.console=
+# The traps are measured by counting SQL statements, so Hibernate keeps statistics in tests (never in production).
+spring.jpa.properties.hibernate.generate_statistics=true
+# 20 connections: each of 8 racing checkouts holds one and the REQUIRES_NEW audit needs a second (ADR 0002).
+# The test transaction of @DataJpaTest seeds hundreds of rows; the production timeout (15 s) must not fail a slow CI machine.
+spring.transaction.default-timeout=300s
+spring.datasource.hikari.maximum-pool-size=20
+```
+
+| Key | Value in this file | What it does |
+| --- | --- | --- |
+| `logging.structured.format.console` | `(empty)` | Print each log line to the console as one JSON object (the "logstash" layout) instead of plain text. Tools can then search by field. |
+| `spring.jpa.properties.hibernate.generate_statistics` | `true` | Make Hibernate count what it does (statements prepared, entities loaded). The tests read these counts. |
+| `spring.transaction.default-timeout` | `300s` | The longest a transaction may run before it is rolled back. |
+| `spring.datasource.hikari.maximum-pool-size` | `20` | The most open database connections the pool keeps. |
+
+One more file has a similar look but is not a properties file for Spring: `.mvn/jvm.config`. It holds one JVM option per line, and Maven passes them to the Java process that runs Maven itself (see `maven.md`).
 
 ## Try it yourself
 

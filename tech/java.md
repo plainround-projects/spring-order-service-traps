@@ -20,6 +20,8 @@ The lesson is about Spring, and Spring is a Java framework. This repository is w
 
 ## How it works underneath
 
+A few more words used below. A **thread** is one line of execution inside a running program; a program can run many at once, and a web server uses one per request. An **exception** is an object a method throws when something goes wrong; it travels up the chain of callers until some code catches it, and if none does the thread ends with an error. **`null`** is the value of a reference that points to nothing. A **generic type** such as `List<Book>` is a list that holds only books; the part in angle brackets is a type parameter. `static` means "belongs to the class, not to one object"; `final` on a field means "set once, never changed"; `private` means "visible only inside this class". `Optional<T>` is a box that holds a value or is empty, used instead of `null` for "maybe nothing".
+
 1. `javac` reads `.java` files and writes `.class` files. In this repository Maven calls it for you.
 2. A **package** is a folder of classes. The line `package dev.plainround.orders.domain;` at the top of a file says which folder the class belongs to.
 3. A **class** describes a kind of object: its data (fields) and its actions (methods). A **record** is a short form of a class that only holds data and cannot change after it is built. An **interface** lists methods without writing their code; other classes promise to provide them.
@@ -62,6 +64,169 @@ public record OrderLine(String sku, int quantity) {
 **Checked and unchecked exceptions.** All the project's errors extend `RuntimeException` (unchecked): the compiler does not force every caller to catch them. Each has a name that says what went wrong, such as `OutOfStock`, and one place (the "advice" class) turns them into HTTP answers.
 
 **Compiler settings.** The build runs `javac` with `-Xlint:all -Werror`: every warning becomes an error. That keeps unchecked casts and deprecated calls out of the code.
+
+**Every Java file in this repository, and what it is.** The descriptions below are the first sentence of each class's own documentation comment (the `/** ... */` block above the class, called Javadoc).
+
+| File | What it is |
+| --- | --- |
+| `src/main/java/dev/plainround/orders/OrderServiceApplication.java` | Entry point of the order service. |
+| `src/main/java/dev/plainround/orders/application/AuditService.java` | Reads the audit trail. |
+| `src/main/java/dev/plainround/orders/application/CheckoutService.java` | Places an order: all of it, or none of it. |
+| `src/main/java/dev/plainround/orders/application/CustomerService.java` | Registers customers and looks them up. |
+| `src/main/java/dev/plainround/orders/application/OrderQueryService.java` | Reads a customer's orders. |
+| `src/main/java/dev/plainround/orders/application/StockService.java` | Sets and reads the units on hand. |
+| `src/main/java/dev/plainround/orders/domain/AuditEntry.java` | One line of the audit trail. |
+| `src/main/java/dev/plainround/orders/domain/AuditLog.java` | Port: the audit trail. |
+| `src/main/java/dev/plainround/orders/domain/Customer.java` | A customer who places orders. |
+| `src/main/java/dev/plainround/orders/domain/CustomerNotFound.java` | No customer has the requested id. |
+| `src/main/java/dev/plainround/orders/domain/CustomerRepository.java` | Port: where customers are kept. |
+| `src/main/java/dev/plainround/orders/domain/InvalidCustomer.java` | A customer was built with values that break its invariants. |
+| `src/main/java/dev/plainround/orders/domain/InvalidOrder.java` | An order or one of its lines breaks a rule, such as an empty basket or the same SKU twice. |
+| `src/main/java/dev/plainround/orders/domain/Order.java` | A stored order with its lines. |
+| `src/main/java/dev/plainround/orders/domain/OrderDraft.java` | What a customer asks to buy, before it is stored. |
+| `src/main/java/dev/plainround/orders/domain/OrderLine.java` | One line of an order. |
+| `src/main/java/dev/plainround/orders/domain/OrderRepository.java` | Port: where orders are kept. |
+| `src/main/java/dev/plainround/orders/domain/OutOfStock.java` | A SKU has too few units left, or no stock record at all. |
+| `src/main/java/dev/plainround/orders/domain/StockConflict.java` | Another checkout changed the same stock row first; the caller may retry the whole checkout. |
+| `src/main/java/dev/plainround/orders/domain/StockRepository.java` | Port: the units on hand per SKU. |
+| `src/main/java/dev/plainround/orders/infrastructure/ClockConfig.java` | The one place the real clock is created; tests replace this bean with a fixed one. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/AuditJpaRepository.java` | Spring Data access to the audit trail. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/AuditRecordEntity.java` | The `audit_records` table. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/CustomerEntity.java` | The `customers` table. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/CustomerJpaRepository.java` | Spring Data access to customers. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaAuditLog.java` | Adapter: the audit trail. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaCustomerRepository.java` | Adapter: the customer port on top of Spring Data JPA. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaOrderRepository.java` | Adapter: the order port on top of Spring Data JPA. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaStockRepository.java` | Adapter: the stock port on top of Spring Data JPA, with optimistic locking on every change. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/OrderEntity.java` | The `orders_table` table ("order" is a reserved SQL word). |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/OrderJpaRepository.java` | Spring Data access to orders. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/OrderLineEntity.java` | The `order_lines` table. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/StockItemEntity.java` | The `stock_items` table; `version` makes concurrent updates of one row fail loudly. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/StockJpaRepository.java` | Spring Data access to stock records. |
+| `src/main/java/dev/plainround/orders/interfaces/web/AuditController.java` | HTTP face of the audit trail (read only). |
+| `src/main/java/dev/plainround/orders/interfaces/web/AuditResponse.java` | An audit entry as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CheckoutRequest.java` | The body of `POST /customers/{id`/orders}. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CustomerController.java` | HTTP face of the customers. |
+| `src/main/java/dev/plainround/orders/interfaces/web/CustomerResponse.java` | A customer as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/LineRequest.java` | One line of a checkout request. |
+| `src/main/java/dev/plainround/orders/interfaces/web/NewCustomerRequest.java` | The body of `POST /customers`. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrderController.java` | HTTP face of checkout and of a customer's order list. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrderResponse.java` | An order as the API shows it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrdersExceptionHandler.java` | The one place errors become `application/problem+json`: the service's named errors, validation failures with the failing fields, the framework's own exceptions (through the parent class) and a last resort that never leaks the cause. |
+| `src/main/java/dev/plainround/orders/interfaces/web/RequestIdFilter.java` | Gives every request an id for the logs: the caller's `X-Request-Id` when it looks safe, else a new one. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockController.java` | HTTP face of the stock levels. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockRequest.java` | The body of `PUT /stock/{sku`}. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockResponse.java` | The units on hand for a SKU. |
+
+**Every test class, with the tests inside it** (a test method's name is a sentence about behavior; see `junit.md`):
+
+- `src/test/java/dev/plainround/orders/ApplicationConfigurationTest.java`:
+  - `openInViewIsOffAndHibernateOnlyValidatesTheSchemaFlywayOwns`
+  - `logsAreJsonShutdownIsGracefulAndProbesAreOn`
+  - `theDatabasePasswordHasNoDefaultAndEveryDatabaseCallIsBounded`
+- `src/test/java/dev/plainround/orders/ArchitectureTest.java`:
+  - `layersOnlyDependInward`
+  - `domainDependsOnNothingButTheJdk`
+  - `applicationKnowsOnlyTheDomainTheJdkLoggingAndTransactions`
+  - `persistenceEntitiesStayInsideTheirPackage`
+  - `noFieldInjection`
+  - `controllersLiveInTheInterfacesLayer`
+  - `adaptersLiveInInfrastructure`
+  - `noPackageCycles`
+  - `noSelfInvocationOfTransactionalMethods`
+  - `transactionalIsNeverOnAPrivateMethod`
+- `src/test/java/dev/plainround/orders/OrderServiceScenarioIT.java`:
+  - `checkoutListFailAndAuditThroughTheApi`
+  - `errorsAreProblemJsonAtTheBoundary`
+  - `healthIsUpWithTheDatabaseBehindIt`
+- `src/test/java/dev/plainround/orders/ReviewChecklistTest.java`:
+  - `theChecklistHasFiveLinesAndEveryLineNamesAnExistingTest`
+- `src/test/java/dev/plainround/orders/SqlMirrorTest.java`:
+  - `sqlMigrationsMirrorTheFlywayMigrations`
+- `src/test/java/dev/plainround/orders/application/CheckoutServiceTest.java`:
+  - `checkoutAuditsFirstThenPlacesTheOrderThenReservesEveryLine`
+  - `anOutOfStockLineStopsTheCheckoutAndLaterLinesAreNotReserved`
+  - `anUnknownCustomerStillLeavesTheAuditEntryAndPlacesNothing`
+  - `aRepeatedSkuIsRejectedBeforeAnythingIsStored`
+- `src/test/java/dev/plainround/orders/application/QueryAndCustomerServicesTest.java`:
+  - `registerStoresAValidatedName`
+  - `registerRejectsABlankNameBeforeStoring`
+  - `requireOfAnUnknownIdIsCustomerNotFound`
+  - `listOrdersChecksTheCustomerThenReadsTheOrders`
+  - `stockServiceSetsAndReadsLevelsAndNamesAMissingSku`
+  - `auditServiceReturnsTheNewestEntries`
+- `src/test/java/dev/plainround/orders/domain/CustomerAndOrderTest.java`:
+  - `aCustomerNeedsANameOfOneToHundredCharacters`
+  - `aStoredOrderKeepsItsOwnCopyOfTheLines`
+  - `namedErrorsSayWhatWentWrong`
+- `src/test/java/dev/plainround/orders/domain/OrderDraftTest.java`:
+  - `aDraftNeedsAtLeastOneLine`
+  - `aDraftHasAtMostFiftyLines`
+  - `theSameSkuOnTwoLinesIsRejected`
+  - `theDraftKeepsItsOwnCopyOfTheLines`
+- `src/test/java/dev/plainround/orders/domain/OrderLineTest.java`:
+  - `aLineKeepsItsSkuAndQuantity`
+  - `quantitiesOutsideOneToAThousandAreRejected`
+  - `blankOrOverlongSkusAreRejected`
+- `src/test/java/dev/plainround/orders/interfaces/web/CustomerStockAuditControllersTest.java`:
+  - `registerReturns201WithTheNewCustomer`
+  - `aBlankNameIs400NamingTheField`
+  - `getOfAnUnknownCustomerIs404`
+  - `putSetsTheStockLevel`
+  - `aNegativeLevelIs400`
+  - `getOfASkuWithoutAStockRecordIs409OutOfStock`
+  - `auditReturnsTheNewestEntriesAndBoundsTheLimit`
+- `src/test/java/dev/plainround/orders/interfaces/web/OrderControllerTest.java`:
+  - `checkoutReturns201WithTheStoredOrder`
+  - `anEmptyBasketIs400NamingTheLines`
+  - `aBadLineIs400NamingTheLineAndField`
+  - `anUnknownCustomerIs404`
+  - `anOutOfStockLineIs409`
+  - `aLostStockRaceIs409NamedConcurrentUpdate`
+  - `aRuleTheAnnotationsCannotExpressIs422`
+  - `listReturnsTheOrdersWithTheirLines`
+  - `aNonNumericCustomerIdIsAProblemDetail400`
+  - `anUnexpectedErrorIs500WithoutLeakingTheMessage`
+- `src/test/java/dev/plainround/orders/interfaces/web/RequestIdFilterTest.java`:
+  - `aSafeIncomingIdIsKeptAndPutInTheLogContextForTheRequestOnly`
+  - `anUnsafeIncomingIdIsReplacedSoItCannotForgeLogLines`
+  - `aMissingIdIsGenerated`
+- `src/test/java/dev/plainround/orders/support/DatabaseReset.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/support/Evidence.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/support/PostgresContainer.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/AuditIT.java`:
+  - `sameTransactionAuditIsLostWhenCheckoutFails`
+  - `auditWithRequiresNewSurvivesRollback`
+  - `requiresNewOnTheSameBeanIsIgnored`
+- `src/test/java/dev/plainround/orders/traps/AuditTrapBeans.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/CheckoutIT.java`:
+  - `checkoutStoresTheOrderWithAllItsLinesAndTakesTheStock`
+  - `aLaterLineOutOfStockRollsBackTheOrderAndTheEarlierReservationButKeepsTheAudit`
+  - `anUnknownCustomerLeavesOnlyTheAuditEntry`
+  - `aTransactionThatReadAStaleStockVersionLosesTheRaceInsteadOfOverwriting`
+  - `racingCheckoutsForTheLastUnitsNeverOversell`
+- `src/test/java/dev/plainround/orders/traps/LazyEndpointConfig.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/NPlusOneIT.java`:
+  - `theNaiveListingRunsOneQueryForTheOrdersAndOneMorePerOrderForItsLines`
+  - `theNaiveCountKeepsGrowingWith200Orders`
+  - `fetchJoinLoadsTwentyOrdersWithTheirLinesInOneStatement`
+  - `fetchJoinKeepsQueryCountFlatAt200Orders`
+- `src/test/java/dev/plainround/orders/traps/NaiveOrderJpaRepository.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/OpenInViewIT.java`:
+  - `aLazyLoadOutsideATransactionFailsWhenOpenInViewIsOff`
+- `src/test/java/dev/plainround/orders/traps/OpenInViewOnIT.java`:
+  - `openInViewOnHidesTheLazyLoadByKeepingTheSessionOpenForTheWholeRequest`
+- `src/test/java/dev/plainround/orders/traps/OrderModelIT.java`:
+  - `savesAndReadsBackACustomerWithTwoOrdersOfThreeLinesEach`
+  - `loadingOneOrderByIdIsExactlyOneStatement`
+  - `openInViewIsExplicitlyOffInTheApplicationConfiguration`
+- `src/test/java/dev/plainround/orders/traps/SchemaMirrorIT.java`:
+  - `theSchemaScriptBuildsTheSameSchemaAsTheMigrations`
+- `src/test/java/dev/plainround/orders/traps/SelfInvocationIT.java`:
+  - `selfInvocationLeavesAPartialOrderOnFailure`
+  - `proxyFixedRollsBackCompletelyOnTheSameFailure`
+  - `proxyFixedCommitsTheWholeOrderWhenNothingFails`
+- `src/test/java/dev/plainround/orders/traps/SelfInvokingCheckout.java`: a helper used by the tests
 
 ## Try it yourself
 

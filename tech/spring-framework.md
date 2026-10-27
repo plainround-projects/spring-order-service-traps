@@ -102,6 +102,27 @@ static final ArchRule noFieldInjection =
 
 `ArchitectureTest` also contains a rule that fails if a class calls a `@Transactional` method of its own class.
 
+**Every production class that Spring creates as a bean** (marked `@Component`, `@Service`, `@Repository`, `@RestController`, `@RestControllerAdvice` or `@Configuration`):
+
+| File | What it is |
+| --- | --- |
+| `src/main/java/dev/plainround/orders/application/AuditService.java` | Reads the audit trail. |
+| `src/main/java/dev/plainround/orders/application/CheckoutService.java` | Places an order: all of it, or none of it. |
+| `src/main/java/dev/plainround/orders/application/CustomerService.java` | Registers customers and looks them up. |
+| `src/main/java/dev/plainround/orders/application/OrderQueryService.java` | Reads a customer's orders. |
+| `src/main/java/dev/plainround/orders/application/StockService.java` | Sets and reads the units on hand. |
+| `src/main/java/dev/plainround/orders/infrastructure/ClockConfig.java` | The one place the real clock is created; tests replace this bean with a fixed one. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaAuditLog.java` | Adapter: the audit trail. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaCustomerRepository.java` | Adapter: the customer port on top of Spring Data JPA. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaOrderRepository.java` | Adapter: the order port on top of Spring Data JPA. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaStockRepository.java` | Adapter: the stock port on top of Spring Data JPA, with optimistic locking on every change. |
+| `src/main/java/dev/plainround/orders/interfaces/web/AuditController.java` | HTTP face of the audit trail (read only). |
+| `src/main/java/dev/plainround/orders/interfaces/web/CustomerController.java` | HTTP face of the customers. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrderController.java` | HTTP face of checkout and of a customer's order list. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrdersExceptionHandler.java` | The one place errors become `application/problem+json`: the service's named errors, validation failures with the failing fields, the framework's own exceptions (through the parent class) and a last resort that never leaks the cause. |
+| `src/main/java/dev/plainround/orders/interfaces/web/RequestIdFilter.java` | Gives every request an id for the logs: the caller's `X-Request-Id` when it looks safe, else a new one. |
+| `src/main/java/dev/plainround/orders/interfaces/web/StockController.java` | HTTP face of the stock levels. |
+
 ## Try it yourself
 
 1. Start the application and list the beans: read the startup log for `Bean 'checkoutService'` style lines with `--debug`, or add `beans` to `management.endpoints.web.exposure.include`.

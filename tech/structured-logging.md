@@ -50,6 +50,14 @@ try {
 
 No secrets are logged: nothing in the code prints passwords, tokens or request bodies.
 
+**Every production class that writes log lines:**
+
+| File | What it is |
+| --- | --- |
+| `src/main/java/dev/plainround/orders/application/CheckoutService.java` | Places an order: all of it, or none of it. |
+| `src/main/java/dev/plainround/orders/interfaces/web/OrdersExceptionHandler.java` | The one place errors become `application/problem+json`: the service's named errors, validation failures with the failing fields, the framework's own exceptions (through the parent class) and a last resort that never leaks the cause. |
+| `src/main/java/dev/plainround/orders/interfaces/web/RequestIdFilter.java` | Gives every request an id for the logs: the caller's `X-Request-Id` when it looks safe, else a new one. |
+
 ## Try it yourself
 
 1. Start the service and send a request: `curl localhost:18102/audit -H 'X-Request-Id: demo-1'`. Then read the service log: `docker compose logs --tail 20` (or the terminal of `make serve`).

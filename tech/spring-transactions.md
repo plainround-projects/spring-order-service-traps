@@ -20,6 +20,8 @@ The second and third traps are about this annotation: a `@Transactional` method 
 
 ## How it works underneath
 
+A **database connection** is an open line between your program and the database; SQL travels over it. A **transaction** runs on one connection: `BEGIN`, then your statements, then `COMMIT` (make the changes permanent and visible) or `ROLLBACK` (undo them all). A **thread-local** is a variable that has a separate value for every thread; Spring uses one to remember "this thread's current connection and transaction". An **unchecked exception** is one that Java does not force you to declare or catch (a subclass of `RuntimeException`).
+
 1. Spring wraps a bean that has `@Transactional` methods in a **proxy** (see `spring-framework.md`). A call from outside goes proxy → open transaction → real method → commit or roll back.
 2. The transaction is tied to the current **thread**: Spring keeps the open connection in a thread-local holder, and every repository call on that thread uses it.
 3. `readOnly = true` is a hint: it lets Hibernate skip dirty checking and lets the driver and database optimize.
@@ -93,6 +95,34 @@ static final ArchRule transactionalIsNeverOnAPrivateMethod =
 A custom condition looks at every call a class makes and fails the build if the target is a `@Transactional` method of the same class; a second rule forbids `@Transactional` on private methods. A mistake that passes code review becomes a red build.
 
 **Concurrency with connections.** `REQUIRES_NEW` takes a second connection while the first is held. With a pool of 10, ten checkouts at the same time could each hold one connection and wait for a second: a deadlock-like stall. The test configuration uses a pool of 20 for the eight-thread race test (ADR 0002).
+
+**Every class that uses `@Transactional`, in production and in the planted traps:**
+
+| File | What it is |
+| --- | --- |
+| `src/main/java/dev/plainround/orders/application/CheckoutService.java` | Places an order: all of it, or none of it. |
+| `src/main/java/dev/plainround/orders/application/CustomerService.java` | Registers customers and looks them up. |
+| `src/main/java/dev/plainround/orders/application/OrderQueryService.java` | Reads a customer's orders. |
+| `src/main/java/dev/plainround/orders/application/StockService.java` | Sets and reads the units on hand. |
+| `src/main/java/dev/plainround/orders/infrastructure/persistence/JpaAuditLog.java` | Adapter: the audit trail. |
+
+- `src/test/java/dev/plainround/orders/ArchitectureTest.java`:
+  - `layersOnlyDependInward`
+  - `domainDependsOnNothingButTheJdk`
+  - `applicationKnowsOnlyTheDomainTheJdkLoggingAndTransactions`
+  - `persistenceEntitiesStayInsideTheirPackage`
+  - `noFieldInjection`
+  - `controllersLiveInTheInterfacesLayer`
+  - `adaptersLiveInInfrastructure`
+  - `noPackageCycles`
+  - `noSelfInvocationOfTransactionalMethods`
+  - `transactionalIsNeverOnAPrivateMethod`
+- `src/test/java/dev/plainround/orders/traps/AuditTrapBeans.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/SelfInvocationIT.java`:
+  - `selfInvocationLeavesAPartialOrderOnFailure`
+  - `proxyFixedRollsBackCompletelyOnTheSameFailure`
+  - `proxyFixedCommitsTheWholeOrderWhenNothingFails`
+- `src/test/java/dev/plainround/orders/traps/SelfInvokingCheckout.java`: a helper used by the tests
 
 ## Try it yourself
 

@@ -61,6 +61,43 @@ class CheckoutIT {
 
 `DatabaseReset.truncate(jdbc)` (in `support/`) empties all tables with `TRUNCATE ... RESTART IDENTITY CASCADE` between tests that commit real transactions.
 
+**Every test class that uses the container:**
+
+- `src/test/java/dev/plainround/orders/OrderServiceScenarioIT.java`:
+  - `checkoutListFailAndAuditThroughTheApi`
+  - `errorsAreProblemJsonAtTheBoundary`
+  - `healthIsUpWithTheDatabaseBehindIt`
+- `src/test/java/dev/plainround/orders/support/PostgresContainer.java`: a helper used by the tests
+- `src/test/java/dev/plainround/orders/traps/AuditIT.java`:
+  - `sameTransactionAuditIsLostWhenCheckoutFails`
+  - `auditWithRequiresNewSurvivesRollback`
+  - `requiresNewOnTheSameBeanIsIgnored`
+- `src/test/java/dev/plainround/orders/traps/CheckoutIT.java`:
+  - `checkoutStoresTheOrderWithAllItsLinesAndTakesTheStock`
+  - `aLaterLineOutOfStockRollsBackTheOrderAndTheEarlierReservationButKeepsTheAudit`
+  - `anUnknownCustomerLeavesOnlyTheAuditEntry`
+  - `aTransactionThatReadAStaleStockVersionLosesTheRaceInsteadOfOverwriting`
+  - `racingCheckoutsForTheLastUnitsNeverOversell`
+- `src/test/java/dev/plainround/orders/traps/NPlusOneIT.java`:
+  - `theNaiveListingRunsOneQueryForTheOrdersAndOneMorePerOrderForItsLines`
+  - `theNaiveCountKeepsGrowingWith200Orders`
+  - `fetchJoinLoadsTwentyOrdersWithTheirLinesInOneStatement`
+  - `fetchJoinKeepsQueryCountFlatAt200Orders`
+- `src/test/java/dev/plainround/orders/traps/OpenInViewIT.java`:
+  - `aLazyLoadOutsideATransactionFailsWhenOpenInViewIsOff`
+- `src/test/java/dev/plainround/orders/traps/OpenInViewOnIT.java`:
+  - `openInViewOnHidesTheLazyLoadByKeepingTheSessionOpenForTheWholeRequest`
+- `src/test/java/dev/plainround/orders/traps/OrderModelIT.java`:
+  - `savesAndReadsBackACustomerWithTwoOrdersOfThreeLinesEach`
+  - `loadingOneOrderByIdIsExactlyOneStatement`
+  - `openInViewIsExplicitlyOffInTheApplicationConfiguration`
+- `src/test/java/dev/plainround/orders/traps/SchemaMirrorIT.java`:
+  - `theSchemaScriptBuildsTheSameSchemaAsTheMigrations`
+- `src/test/java/dev/plainround/orders/traps/SelfInvocationIT.java`:
+  - `selfInvocationLeavesAPartialOrderOnFailure`
+  - `proxyFixedRollsBackCompletelyOnTheSameFailure`
+  - `proxyFixedCommitsTheWholeOrderWhenNothingFails`
+
 ## Try it yourself
 
 1. `docker info` must work; then `./mvnw verify -Dit.test=OrderModelIT -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false` starts the container and runs one integration test.
