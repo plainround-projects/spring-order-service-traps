@@ -126,6 +126,91 @@ test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /act
 
 Read it in pieces: `["CMD", "bash", "-c", "..."]` runs bash with the string after `-c` as the program. `exec 3<>/dev/tcp/localhost/PORT` opens a network connection to the port on this machine and attaches it, for reading and writing (`<>`), to file descriptor 3. `printf 'GET /actuator/health/readiness HTTP/1.0\r\n\r\n' >&3` writes an HTTP request into it (`>&3` redirects stdout to descriptor 3). `grep -q '"status":"UP"' <&3` reads the answer from descriptor 3 (`<&3`) and succeeds only if the text appears. The `&&` between the three parts means each runs only if the one before succeeded, so the check passes only when the server answers UP.
 
+### The complete scripts
+
+Every script in the `scripts` folder, quoted whole, each followed by a block-by-block reading that explains each command and each symbol. Read [curl](curl.md) and [jq](jq.md) for the two tools these scripts call most.
+
+### `scripts/audit.sh`
+
+The whole file, as it is in the repository:
+
+```bash
+#!/usr/bin/env bash
+# Dependency audit (OSV-Scanner 2.7.0, pinned by digest): OSV-Scanner reads pom.xml (with the Spring Boot parent's managed versions) and reports
+# known vulnerabilities. Fails on any finding that is not listed, with a reason, in osv-scanner.toml.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+IMAGE="${OSV_SCANNER_IMAGE:-ghcr.io/google/osv-scanner@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0}"
+docker run --rm -v "$PWD:/src:ro" -w /src "$IMAGE" scan source --lockfile=pom.xml --config=osv-scanner.toml
+```
+
+Reading it, block by block:
+
+1. Line 1, `#!/usr/bin/env bash`, is the shebang: when you run the file directly, the operating system reads it and starts the program `bash` (found through `env`) to run the rest.
+2. Lines 2 and 3 are comments (a `#` starts a comment; the shell ignores the rest of that line). They say what the script is for.
+3. Line 4, `set -euo pipefail`, makes the script strict. `-e` stops it at the first command that fails, `-u` makes using a variable that was never set an error, and `-o pipefail` makes a chain of commands joined by `|` fail if any part fails, not only the last.
+4. Line 6, `cd "$(dirname "$0")/.."`, moves to the repository root. `$0` is the path this script was started with, `dirname` cuts off the file name leaving the folder (`scripts`), `/..` goes one folder up, and `$( ... )` runs a command and pastes its output. The double quotes keep a path with spaces in one piece.
+5. Line 7 sets `IMAGE`. `${OSV_SCANNER_IMAGE:-default}` means: use the environment variable `OSV_SCANNER_IMAGE` if it is set and not empty, otherwise use the default after `:-`. The default is the OSV-Scanner container image, named by its `sha256` digest (a fingerprint of the exact image contents), so the tool cannot change silently.
+6. Line 8 runs the scanner in a container. `docker run` starts a container; `--rm` deletes it afterwards; `-v "$PWD:/src:ro"` shows the current folder inside the container at `/src` read-only; `-w /src` makes `/src` the working folder; then come the image and the scanner's own arguments: `scan source` (scan source code), `--lockfile=pom.xml` (read the dependency list from `pom.xml`) and `--config=osv-scanner.toml` (read the list of accepted findings, each with a reason). The exit code of the scanner becomes the exit code of the script, which is how `make audit` fails on an unaccepted finding.
+
+
+### `scripts/scenario.sh`
+
+The whole file, as it is in the repository:
+
+```bash
+#!/usr/bin/env bash
+# The lesson's scenario through the HTTP API: checkout, the order list, a checkout that fails halfway, and the
+# audit trail. The three traps themselves are proved by the tests (`make traps`).
+# Usage: scripts/scenario.sh [base-url]   (default http://localhost:18102)
+set -euo pipefail
+
+BASE="${1:-http://localhost:${APP_PORT:-18102}}"
+JSON='Content-Type: application/json'
+heading() { printf '\n== %s\n' "$1"; }
+
+heading "Set up: one customer and two SKUs (sku-keyboard: 5 units, sku-monitor: 0 units)"
+CUSTOMER="$(curl -fsS -X POST "$BASE/customers" -H "$JSON" -d '{"name":"Ada Example"}')"
+echo "$CUSTOMER" | jq -c .
+ID="$(echo "$CUSTOMER" | jq -r .id)"
+curl -fsS -X PUT "$BASE/stock/sku-keyboard" -H "$JSON" -d '{"available":5}' | jq -c .
+curl -fsS -X PUT "$BASE/stock/sku-monitor" -H "$JSON" -d '{"available":0}' | jq -c .
+
+heading "Checkout: two keyboards -> 201, the order with its lines"
+curl -fsS -X POST "$BASE/customers/$ID/orders" -H "$JSON" -d '{"lines":[{"sku":"sku-keyboard","quantity":2}]}' | jq -c .
+
+heading "The customer's orders with their lines (one query for any number of orders, see make traps)"
+curl -fsS "$BASE/customers/$ID/orders" | jq -c .
+
+heading "Trap 2 fixed: a checkout whose second line is out of stock is 409 and rolls back as a whole"
+curl -sS -i -X POST "$BASE/customers/$ID/orders" -H "$JSON" \
+  -d '{"lines":[{"sku":"sku-keyboard","quantity":1},{"sku":"sku-monitor","quantity":1}]}' |
+  tr -d '\r' | grep -E '^(HTTP|Content-Type)|^\{' | sed 's/^{/body: {/'
+echo "orders still stored: $(curl -fsS "$BASE/customers/$ID/orders" | jq length)   (1, the failed one left nothing)"
+echo "sku-keyboard stock:  $(curl -fsS "$BASE/stock/sku-keyboard" | jq .available)   (3, the failed one gave its unit back)"
+
+heading "Trap 3 fixed: both attempts, including the failed one, are in the audit trail"
+curl -fsS "$BASE/audit?limit=5" | jq -c '.[] | {action, detail}'
+
+heading "Validation, errors and health"
+curl -sS -X POST "$BASE/customers" -H "$JSON" -d '{"name":""}' | jq -c .
+curl -sS "$BASE/customers/999999/orders" | jq -c .
+curl -fsS "$BASE/actuator/health" | jq -c .
+```
+
+Reading it, block by block:
+
+1. Lines 1 to 5: shebang, comments (what the scenario shows; the traps themselves are proved by tests) and strict mode.
+2. Lines 7 to 9: `BASE` is the service address (the first argument or `http://localhost:` plus `APP_PORT`, default 18102), `JSON` is the content-type header, and `heading` prints a titled separator.
+3. Lines 11 to 16: creates a customer. `CUSTOMER="$(curl ...)"` stores the response; `curl -fsS -X POST ... -d '{"name":"Ada Example"}'` sends the JSON body. `echo "$CUSTOMER" | jq -c .` prints it compactly. `ID="$(... | jq -r .id)"` extracts the new customer's `id`. The two `PUT` requests set the stock of two products, `sku-keyboard` to 5 and `sku-monitor` to 0 (a SKU is a stock-keeping unit: a product code).
+4. Lines 18 and 19: a checkout of two keyboards. The service answers 201 with the order and its lines.
+5. Lines 21 and 22: lists that customer's orders with their lines. The comment says one query serves any number of orders, which is the fix to the N+1 trap proved by `make traps`.
+6. Lines 24 to 29: a checkout whose second line is out of stock. The `\` at the end of a line continues the command on the next line. `curl -i` shows headers; `tr`, `grep -E` and `sed` keep the status line, the content type and the JSON body, as in the reading-list script. Then two `echo` lines print the number of stored orders (`jq length` counts the array items) and the keyboard stock, which proves the failed checkout rolled back: one order, and 3 keyboards left (5 minus the 2 sold, with the failed attempt's unit returned).
+7. Lines 31 and 32: reads the audit trail with `limit=5`; `jq -c '.[] | {action, detail}'` prints one object per entry with only two fields. It shows that the failed attempt is recorded too, which is the fix to the audit trap.
+8. Lines 34 to 37: an invalid customer name (empty) gives a 400 problem body; an unknown customer id gives an error body; and the health endpoint is printed.
+
+
 ## Try it yourself
 
 1. After `make up`: `scripts/scenario.sh http://localhost:18102`.
