@@ -113,6 +113,8 @@ JSON logs with a `requestId` on every line; health with liveness and readiness p
 
 ## Verification status
 
+Every row marked "pending capacity" needs Docker: restart Docker Desktop with free disk first (Docker.raw was at its 60 GiB cap on 2026-10-28), then run the command in that row.
+
 Run on 2026-10-27 on a Mac that was very heavily loaded (load average above 100) and whose Docker became unusable during the night (see below), so some steps ran several times and some are pending.
 
 | Check | Command | Result |
