@@ -1,0 +1,83 @@
+# curl
+
+## What it is
+
+`curl` is a command-line program that makes HTTP requests and prints the answer. It is the simplest way to call a web service by hand. It is installed on macOS and most Linux systems.
+
+## Why this repository uses it
+
+Every "Done when" line that is about an HTTP answer is shown with a `curl` command, so a reader sees exactly the request and the response. The scripts and the container health checks use the same idea.
+
+## Where it appears
+
+| Path | Role |
+| --- | --- |
+| `scripts/scenario.sh` | the lesson's requests |
+| `Makefile` (`make health`) | calls the readiness endpoint |
+| `README.md` | example commands |
+
+## How it works underneath
+
+1. `curl URL` opens a TCP connection to the host and port in the URL, sends `GET /path HTTP/1.1` plus headers, reads the response (status line, headers, body) and prints the body.
+2. `-X POST` changes the method. `-d 'text'` sets the request body (and implies POST). `-H 'Name: value'` adds a header; `Content-Type: application/json` tells the server the body is JSON.
+3. The exit code of `curl` is 0 on a completed HTTP exchange of any status, unless `-f` is used, which makes HTTP errors (4xx, 5xx) a failure.
+
+## Walkthrough of this repository's use
+
+The flags that appear in this repository:
+
+| Flag | Meaning |
+| --- | --- |
+| `-s` | silent: no progress meter |
+| `-S` | with `-s`, still print errors |
+| `-f` | fail (non-zero exit) on HTTP errors; used where an error would be a bug |
+| `-i` | include the response headers in the output |
+| `-I` or `-D -` | show only headers / dump headers to standard output |
+| `-o /dev/null` | throw the body away |
+| `-w '%{http_code}\n'` | after the transfer, print a value: here the status code (also `%{time_total}`) |
+| `-X METHOD` | choose the method |
+| `-d 'json'` | send a body |
+| `-H 'Content-Type: application/json'` | add a header |
+
+```bash
+CUSTOMER="$(curl -fsS -X POST "$BASE/customers" -H "$JSON" -d '{"name":"Ada Example"}')"
+echo "$CUSTOMER" | jq -c .
+ID="$(echo "$CUSTOMER" | jq -r .id)"
+curl -fsS -X PUT "$BASE/stock/sku-keyboard" -H "$JSON" -d '{"available":5}' | jq -c .
+curl -fsS -X PUT "$BASE/stock/sku-monitor" -H "$JSON" -d '{"available":0}' | jq -c .
+```
+
+`-fsS` is silent but fails and reports on HTTP errors. The first call creates a customer and keeps the JSON; the next two set stock levels with `PUT`.
+
+```bash
+curl -sS -i -X POST "$BASE/customers/$ID/orders" -H "$JSON" \
+  -d '{"lines":[{"sku":"sku-keyboard","quantity":1},{"sku":"sku-monitor","quantity":1}]}' |
+  tr -d '\r' | grep -E '^(HTTP|Content-Type)|^\{' | sed 's/^{/body: {/'
+```
+
+## Try it yourself
+
+1. `curl -s localhost:18102/actuator/health` prints the health JSON.
+2. `curl -si localhost:18102/actuator/health | head -8` shows the status line and headers.
+3. `curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' localhost:18102/actuator/health` prints just `200 0.0xxs`.
+4. `curl -v` shows the whole exchange, including the request curl sent.
+
+## Mistakes people make
+
+- Forgetting `-H 'Content-Type: application/json'` with a JSON body: the server answers 415.
+- Mixing up the quotes in a JSON body so the shell eats the double quotes.
+- Using `curl` in a script without `-f` and treating a 500 as success.
+- Using `localhost` from inside a container to reach another container.
+
+## Check yourself
+
+1. What does `-X POST -d '...'` do? *Sends a POST with that body.*
+2. What does `-f` change? *HTTP error statuses make curl exit non-zero.*
+3. How do you print only the status code? *`-s -o /dev/null -w '%{http_code}'`.*
+4. Why single quotes around JSON? *The shell then keeps the double quotes inside.*
+5. What does `-i` add? *The response headers.*
+
+## Further reading
+
+- curl manual: https://curl.se/docs/manpage.html
+- Everything curl: https://everything.curl.dev/

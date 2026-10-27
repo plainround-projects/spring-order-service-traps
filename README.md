@@ -9,6 +9,7 @@ An order service on Spring Data JPA and PostgreSQL with three bugs that each pas
 | **Level** | Intermediate |
 | **Versions** | Spring Boot 4.1.2 (Spring Framework 7.0, Hibernate 7), Java 25 (the current LTS; the lesson names none), PostgreSQL 18, Flyway 12, Maven 3.9 through the checked-in wrapper |
 | **Architecture** | [ARCHITECTURE.md](ARCHITECTURE.md), decisions: [docs/adr](docs/adr), review checklist: [docs/REVIEW-CHECKLIST.md](docs/REVIEW-CHECKLIST.md) |
+| **Technology notes** | [tech/README.md](tech/README.md): one note per technology used here, written for a complete beginner |
 | **Author** | Sumit Srivastava |
 
 ## Prerequisites
@@ -57,6 +58,7 @@ spring-order-service-traps/
 │   └── ReviewChecklistTest.java, SqlMirrorTest.java, ApplicationConfigurationTest.java
 ├── sql/                                  001_schema.sql, 002_seed.sql, 003_queries.sql, migrations/ (mirror of Flyway)
 ├── docs/                                 REVIEW-CHECKLIST.md, adr/
+├── tech/                                 one note per technology (Java, Spring, SQL, Docker, Bash, ...) for a complete beginner, with the repository\'s own lines explained
 ├── config/checkstyle/, scripts/          lint rules; scenario.sh, audit.sh
 ├── Dockerfile, docker-compose.yml, Makefile, .github/workflows/ci.yml, .env.example, .editorconfig, .gitignore
 └── README.md, ARCHITECTURE.md, CHANGELOG.md, LICENSE
