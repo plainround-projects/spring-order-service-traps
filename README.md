@@ -12,6 +12,24 @@ An order service on Spring Data JPA and PostgreSQL with three bugs that each pas
 | **Technology notes** | [tech/README.md](tech/README.md): one note per technology used here, written for a complete beginner |
 | **Author** | Sumit Srivastava |
 
+## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
+  <img alt="An Orders API client reaches the OrderController, which sends GET to OrderQueryService and POST to CheckoutService; the audit write goes through JpaAuditLog as its own bean, and all repositories reach PostgreSQL 18." src="docs/diagrams/architecture.svg">
+</picture>
+
+The transaction boundary sits on CheckoutService.checkout and the audit is a separate bean with its own transaction, which is what the amber notes say a review misses.
+
+## How one run flows
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/flow-dark.svg">
+  <img alt="A checkout opens one transaction, writes the audit row in another, then stores the order and reserves stock; an exception rolls the order back while the audit row stays." src="docs/diagrams/flow.svg">
+</picture>
+
+The amber row is the rollback: the order, its lines and the reservations vanish together and only the audit row remains.
+
 ## Prerequisites
 
 | Tool | Version | Used for |
